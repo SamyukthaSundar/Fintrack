@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:fragment="base(title, content)">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title th:text="${title} + ' — FinTrack'">FinTrack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" th:href="@{/css/main.css}"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a class="navbar-brand" th:href="@{/dashboard}">
+    ⚡ FinTrack
+  </a>
+
+  <div class="nav-links" sec:authorize="isAuthenticated()">
+    <a class="nav-link" th:href="@{/dashboard}">Dashboard</a>
+    <a class="nav-link" th:href="@{/groups}">Groups</a>
+    <a class="nav-link" th:href="@{/notifications}">
+      🔔
+      <span id="notifBadge" class="nav-badge" style="display:none">0</span>
+    </a>
+    <a class="nav-link" th:href="@{/admin}" sec:authorize="hasRole('ADMIN')">⚙ Admin</a>
+    <span class="nav-link text-muted" sec:authentication="principal.username" style="font-size:0.8rem"></span>
+    <a class="nav-link" th:href="@{/auth/logout}">Logout</a>
+  </div>
+
+  <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">
+    ☀️ Light Mode
+  </button>
+</nav>
+
+<!-- PAGE CONTENT -->
+<main>
+  <div th:replace="${content}"></div>
+</main>
+
+<script th:src="@{/js/main.js}"></script>
+</body>
+</html>
