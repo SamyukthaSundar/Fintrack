@@ -13,10 +13,12 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -186,16 +188,11 @@ public class ExpenseServiceImpl implements ExpenseService {
         File tempFile = null;
         File processedFile = null;
         try {
-<<<<<<< Updated upstream
-            Path tempDir  = Files.createTempDirectory("fintrack_ocr");
-            File tempFile = tempDir.resolve(Objects.requireNonNull(file.getOriginalFilename())).toFile();
-=======
             // Create temp file with proper extension detection
             Path tempDir = Files.createTempDirectory("fintrack_ocr");
             String originalName = Objects.requireNonNull(file.getOriginalFilename(), "unnamed");
             String extension = getExtension(originalName);
             tempFile = tempDir.resolve("receipt_" + System.currentTimeMillis() + extension).toFile();
->>>>>>> Stashed changes
             file.transferTo(tempFile);
             
             log.info("Processing receipt: {} ({} bytes)", originalName, file.getSize());

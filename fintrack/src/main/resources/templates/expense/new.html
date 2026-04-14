@@ -7,6 +7,47 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;800&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" th:href="@{/css/main.css}"/>
+  <meta name="_csrf" th:content="${_csrf.token}"/>
+  <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+  <style>
+    /* ── Split preview box ── */
+    .split-preview-box {
+      background: var(--surface-2, rgba(255,255,255,0.04));
+      border: 1px solid var(--border, rgba(255,255,255,0.08));
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-top: 0.75rem;
+      font-size: 0.82rem;
+    }
+    .split-preview-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.2rem 0;
+      border-bottom: 1px solid var(--border, rgba(255,255,255,0.05));
+    }
+    .split-preview-row:last-child { border-bottom: none; }
+    .split-preview-name { color: var(--text-secondary, #aaa); }
+    .split-preview-amt  { color: var(--neon-green, #00c896); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+    .split-preview-warn { color: #ff6b6b; font-size: 0.78rem; }
+
+    /* ── Participant checkboxes ── */
+    .participant-list { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.4rem; }
+    .participant-item {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid var(--border, rgba(255,255,255,0.08));
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .participant-item:hover { background: var(--surface-2, rgba(255,255,255,0.04)); }
+    .participant-item input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--neon-green, #00c896); cursor: pointer; }
+    .participant-item label { cursor: pointer; font-size: 0.875rem; margin: 0; user-select: none; }
+
+    /* ── Split data rows ── */
+    .split-data-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .split-data-row .member-name { font-size: 0.85rem; min-width: 130px; color: var(--text-secondary, #aaa); }
+  </style>
 </head>
 <body>
 <nav class="navbar">
