@@ -8,13 +8,11 @@ com\fintrack\model\Expense$SplitType.class
 com\fintrack\controller\AdminController.class
 com\fintrack\service\impl\AnalyticsService.class
 com\fintrack\model\AuditLog.class
-com\fintrack\config\WebMvcConfig.class
 com\fintrack\service\impl\CustomUserDetailsService.class
 com\fintrack\repository\SettlementRepository.class
 com\fintrack\model\Group.class
 com\fintrack\config\JpaConfig.class
 com\fintrack\config\SecurityConfig.class
-com\fintrack\controller\GroupController.class
 com\fintrack\model\ExpenseSplit.class
 com\fintrack\model\Group$Builder.class
 com\fintrack\service\SettlementService.class

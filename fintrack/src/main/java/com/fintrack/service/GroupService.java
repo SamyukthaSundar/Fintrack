@@ -1,10 +1,10 @@
 package com.fintrack.service;
 
-import com.fintrack.model.Group;
-import com.fintrack.model.GroupMember;
-
 import java.util.List;
 import java.util.Optional;
+
+import com.fintrack.model.Group;
+import com.fintrack.model.GroupMember;
 
 /**
  * GroupService Interface
@@ -20,4 +20,5 @@ public interface GroupService {
     Group updateGroup(Long groupId, String name, String description, Long requestingUserId);
     void deleteGroup(Long groupId, Long requestingUserId);
     boolean isMember(Long groupId, Long userId);
+    
 }

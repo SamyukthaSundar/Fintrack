@@ -7,45 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;800&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" th:href="@{/css/main.css}"/>
-  <style>
-    /* ── Split preview box ── */
-    .split-preview-box {
-      background: var(--surface-2, rgba(255,255,255,0.04));
-      border: 1px solid var(--border, rgba(255,255,255,0.08));
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      margin-top: 0.75rem;
-      font-size: 0.82rem;
-    }
-    .split-preview-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 0.2rem 0;
-      border-bottom: 1px solid var(--border, rgba(255,255,255,0.05));
-    }
-    .split-preview-row:last-child { border-bottom: none; }
-    .split-preview-name { color: var(--text-secondary, #aaa); }
-    .split-preview-amt  { color: var(--neon-green, #00c896); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
-    .split-preview-warn { color: #ff6b6b; font-size: 0.78rem; }
-
-    /* ── Participant checkboxes ── */
-    .participant-list { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.4rem; }
-    .participant-item {
-      display: flex; align-items: center; gap: 0.6rem;
-      padding: 0.4rem 0.6rem;
-      border-radius: 6px;
-      border: 1px solid var(--border, rgba(255,255,255,0.08));
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .participant-item:hover { background: var(--surface-2, rgba(255,255,255,0.04)); }
-    .participant-item input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--neon-green, #00c896); cursor: pointer; }
-    .participant-item label { cursor: pointer; font-size: 0.875rem; margin: 0; user-select: none; }
-
-    /* ── Split data rows ── */
-    .split-data-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
-    .split-data-row .member-name { font-size: 0.85rem; min-width: 130px; color: var(--text-secondary, #aaa); }
-  </style>
 </head>
 <body>
 <nav class="navbar">
@@ -82,7 +43,7 @@
 
       <!-- ═══ LEFT COLUMN ═══ -->
       <div>
-        <!-- OCR Upload Zone -->
+        <!-- OCR Upload Zone (Samyuktha's major feature) -->
         <div class="card mb-2">
           <div class="card-header">
             <span class="card-title">📷 Scan Receipt (OCR)</span>
@@ -96,10 +57,56 @@
           </div>
           <p id="ocrStatus" style="font-size:0.8rem;margin-top:0.75rem;color:var(--text-muted)"></p>
           <img id="receiptImagePreview" style="max-width:100%;border-radius:8px;margin-top:0.75rem;display:none" alt="Receipt preview"/>
+          
+          <!-- OCR Results Breakdown -->
+          <div id="ocrResults" style="margin-top:1rem;display:none">
+            <div class="card" style="background:var(--surface-variant);border:1px solid var(--border-color)">
+              <div style="padding:0.75rem;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
+                <div id="merchantDisplay" style="flex:1">
+                  <strong style="color:var(--text-primary)" id="ocrMerchant">🏪 Merchant</strong>
+                  <button type="button" class="btn btn-sm btn-ghost" onclick="editMerchant()" title="Edit merchant" style="margin-left:0.5rem">✏️</button>
+                </div>
+                <div id="merchantEdit" style="display:none;flex:1;align-items:center;gap:0.5rem">
+                  <input type="text" id="merchantInput" class="form-control" style="flex:1;font-size:0.9rem">
+                  <button type="button" class="btn btn-sm btn-primary" onclick="saveMerchant()">💾</button>
+                  <button type="button" class="btn btn-sm btn-ghost" onclick="cancelMerchantEdit()">❌</button>
+                </div>
+                <button type="button" id="ocrEditBtn" class="btn btn-sm btn-ghost" onclick="toggleOcrEdit()">✏️ Edit</button>
+              </div>
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem" id="ocrDate"></div>
+              <div style="padding:0.75rem">
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;display:flex;justify-content:space-between">
+                  <span>📋 Items Detected:</span>
+                  <span id="ocrEditHint" style="display:none;color:var(--neon-amber);font-size:0.7rem">Click items to edit</span>
+                </div>
+                <div id="ocrItems" style="font-size:0.85rem;max-height:200px;overflow-y:auto"></div>
+                <div id="ocrEditControls" style="display:none;margin-top:0.75rem;padding-top:0.5rem;border-top:1px dashed var(--border-color)">
+                  <div style="display:flex;gap:0.5rem">
+                    <input type="text" id="newItemName" placeholder="Item name" class="form-control" style="flex:1;font-size:0.85rem">
+                    <input type="number" id="newItemPrice" placeholder="₹" class="form-control" style="width:80px;font-size:0.85rem" step="0.01">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="addOcrItem()">+ Add</button>
+                  </div>
+                </div>
+                <div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
+                  <span style="font-size:0.8rem;color:var(--text-muted)">💰 Total:</span>
+                  <div style="text-align:right">
+                    <strong style="color:var(--neon-lime);font-size:1.1rem" id="ocrTotal">₹0.00</strong>
+                    <div id="ocrCalcTotal" style="font-size:0.7rem;color:var(--text-muted)"></div>
+                  </div>
+                </div>
+              </div>
+              <div style="padding:0.5rem 0.75rem;background:var(--surface);border-top:1px solid var(--border-color)">
+                <details>
+                  <summary style="font-size:0.75rem;color:var(--text-muted);cursor:pointer">📝 Raw Text</summary>
+                  <pre id="ocrRawText" style="margin-top:0.5rem;font-size:0.7rem;color:var(--text-secondary);white-space:pre-wrap;max-height:100px;overflow:auto"></pre>
+                </details>
+              </div>
+            </div>
+          </div>
+          
           <div id="ocrPreview" style="margin-top:0.5rem"></div>
         </div>
 
-        <!-- Paid By & Date -->
         <div class="card">
           <div class="form-group">
             <label class="form-label">Paid By</label>
@@ -155,20 +162,23 @@
         <div class="card">
           <div class="form-group">
             <label class="form-label">Expense Title</label>
-            <input type="text" name="title" class="form-control" placeholder="e.g. Dinner at Pizza Hut" required/>
+            <!-- FIXED: added id -->
+            <input type="text" id="title" name="title" class="form-control" placeholder="e.g. Dinner at Pizza Hut" required/>
           </div>
+
           <div class="form-group">
             <label class="form-label">Description (optional)</label>
             <textarea name="description" class="form-control" rows="2"
                       placeholder="Additional details..."></textarea>
           </div>
+
           <div class="form-group">
             <label class="form-label">Total Amount (₹)</label>
             <input type="number" name="totalAmount" id="totalAmount" class="form-control"
                    step="0.01" min="0.01" placeholder="0.00" required/>
           </div>
 
-          <!-- Split Strategy -->
+          <!-- Split Type (Samyuktha's minor feature — Strategy Pattern) -->
           <div class="form-group">
             <label class="form-label">Split Strategy</label>
             <select name="splitType" id="splitType" class="form-control">
@@ -177,15 +187,10 @@
             <small id="splitHint" style="color:var(--text-muted);font-size:0.78rem;margin-top:0.3rem;display:block"></small>
           </div>
 
-          <!-- ── EQUAL: no split data needed ── -->
+          <!-- EQUAL: no extra UI needed -->
           <div id="split-equal" class="split-section"></div>
 
-          <!-- ── PERCENTAGE ──
-               Each input carries data-user-id so JS can:
-               (a) disable it when participant is unchecked
-               (b) read its value for the live preview
-               The th:name generates splitData[userId] for the server.
-          -->
+          <!-- PERCENTAGE -->
           <div id="split-percentage" class="split-section" style="display:none">
             <label class="form-label">Percentages <small style="color:var(--text-muted)">(must sum to 100)</small></label>
             <div th:each="m : ${members}"
@@ -201,7 +206,7 @@
             </div>
           </div>
 
-          <!-- ── EXACT ── -->
+          <!-- EXACT -->
           <div id="split-exact" class="split-section" style="display:none">
             <label class="form-label">Exact Amounts <small style="color:var(--text-muted)">(₹, must sum to total)</small></label>
             <div th:each="m : ${members}"
@@ -217,7 +222,7 @@
             </div>
           </div>
 
-          <!-- ── WEIGHTED ── -->
+          <!-- WEIGHTED -->
           <div id="split-weighted" class="split-section" style="display:none">
             <label class="form-label">Weights <small style="color:var(--text-muted)">(relative, e.g. 2:1:1)</small></label>
             <div th:each="m : ${members}"
@@ -247,5 +252,217 @@
 </div>
 
 <script th:src="@{/js/main.js}"></script>
+
+<script>
+document.getElementById("receiptFile").addEventListener("change", async function () {
+    const file = this.files[0];
+    if (!file) return;
+
+    const preview = document.getElementById("receiptImagePreview");
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = "block";
+
+    document.getElementById("ocrStatus").innerText = "Processing OCR...";
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        const response = await fetch("/api/ocr/extract", {
+            method: "POST",
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('input[name="_csrf"]').value
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+            document.getElementById("ocrStatus").innerText = "❌ OCR failed: " + (data.error || "Unknown error");
+            return;
+        }
+
+        // Fill form fields
+        document.getElementById("title").value = data.title || data.merchant || "";
+        document.getElementById("totalAmount").value = data.amount || "";
+
+        // Store items for editing
+        window.ocrItems = data.items || [];
+        window.ocrEditMode = false;
+        renderOcrItems();
+
+        // Show structured breakdown
+        document.getElementById("ocrResults").style.display = "block";
+        document.getElementById("ocrMerchant").innerText = "🏪 " + (data.merchant || "Unknown Merchant");
+        document.getElementById("ocrDate").innerText = data.date ? "📅 " + data.date : "";
+        document.getElementById("ocrTotal").innerText = "₹" + (data.amount || "0.00");
+        
+        // Show raw text in collapsible section
+        document.getElementById("ocrRawText").innerText = data.textPreview || data.rawText || "";
+
+        document.getElementById("ocrStatus").innerText = `✅ OCR complete! Found ${(data.items || []).length} items`;
+        document.getElementById("ocrEditBtn").style.display = (data.items && data.items.length > 0) ? "inline-block" : "none";
+
+    } catch (error) {
+        document.getElementById("ocrStatus").innerText = "❌ OCR failed: " + error.message;
+    }
+});
+
+function renderOcrItems() {
+    const container = document.getElementById("ocrItems");
+    if (!window.ocrItems || window.ocrItems.length === 0) {
+        container.innerHTML = `<div style="color:var(--text-muted);font-style:italic">No items detected</div>`;
+        updateOcrTotal();
+        return;
+    }
+    
+    const ocrItemsHtml = [];
+    window.ocrItems.forEach((item, index) => {
+        const qty = item.qty || 1;
+        const unitPrice = item.price || (item.amount && item.qty ? item.amount / item.qty : item.amount) || 0;
+        const total = qty * unitPrice;
+        ocrItemsHtml.push(`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.25rem 0;border-bottom:1px solid var(--border-color)">
+                <div style="flex:1;display:flex;align-items:center;gap:0.5rem">
+                    <span style="font-size:0.9rem">${item.name || 'Item'}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.25rem;margin-right:0.5rem">
+                    <button type="button" class="btn btn-sm btn-ghost" onclick="changeQty(${index}, -1)" style="padding:0.1rem 0.3rem;font-size:0.75rem">−</button>
+                    <span style="min-width:1.5rem;text-align:center;font-size:0.85rem">${qty}</span>
+                    <button type="button" class="btn btn-sm btn-ghost" onclick="changeQty(${index}, 1)" style="padding:0.1rem 0.3rem;font-size:0.75rem">+</button>
+                    <span style="color:var(--text-secondary);margin-left:0.5rem;min-width:4rem;text-align:right">₹${total.toFixed(2)}</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-ghost" onclick="editOcrItem(${index})" title="Edit">✏️</button>
+                <button type="button" class="btn btn-sm btn-ghost" onclick="deleteOcrItem(${index})" title="Delete" style="color:var(--error)">🗑️</button>
+            </div>
+        `);
+    });
+    container.innerHTML = ocrItemsHtml.join("");
+    updateOcrTotal();
+}
+
+function changeQty(index, delta) {
+    const item = window.ocrItems[index];
+    const currentQty = item.qty || 1;
+    const newQty = Math.max(1, currentQty + delta); // Minimum 1
+    
+    // Calculate unit price first
+    const unitPrice = item.price || (item.amount && currentQty ? item.amount / currentQty : item.amount) || 0;
+    
+    item.qty = newQty;
+    item.amount = newQty * unitPrice;
+    item.price = unitPrice; // Store unit price
+    
+    renderOcrItems();
+}
+
+function updateOcrTotal() {
+    const calcTotal = window.ocrItems.reduce((sum, item) => {
+        return sum + (parseFloat(item.amount) || parseFloat(item.price) || 0);
+    }, 0);
+    document.getElementById("ocrCalcTotal").innerText = `Items sum: ₹${calcTotal.toFixed(2)}`;
+    
+    // Warn if totals don't match
+    const ocrTotal = parseFloat(document.getElementById("ocrTotal").innerText.replace('₹', '')) || 0;
+    if (Math.abs(calcTotal - ocrTotal) > 0.01) {
+        document.getElementById("ocrCalcTotal").innerHTML += ` <span style="color:var(--error)">⚠️ Diff: ₹${(ocrTotal - calcTotal).toFixed(2)}</span>`;
+    }
+}
+
+function deleteOcrItem(index) {
+    if (confirm('Delete this item?')) {
+        window.ocrItems.splice(index, 1);
+        renderOcrItems();
+    }
+}
+
+function toggleOcrEdit() {
+    window.ocrEditMode = !window.ocrEditMode;
+    document.getElementById("ocrEditHint").style.display = window.ocrEditMode ? "inline" : "none";
+    document.getElementById("ocrEditControls").style.display = window.ocrEditMode ? "block" : "none";
+}
+
+function addOcrItem() {
+    const newItemName = document.getElementById("newItemName").value.trim();
+    const newItemPrice = parseFloat(document.getElementById("newItemPrice").value);
+    if (newItemName && newItemPrice > 0) {
+        window.ocrItems.push({ name: newItemName, price: newItemPrice, qty: 1, amount: newItemPrice });
+        renderOcrItems();
+        document.getElementById("newItemName").value = "";
+        document.getElementById("newItemPrice").value = "";
+    }
+}
+
+function editOcrItem(index) {
+    const item = window.ocrItems[index];
+    const editHtml = `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.25rem 0;border-bottom:1px solid var(--border-color)">
+            <input type="text" value="${item.name || 'Item'}" style="flex:1;font-size:0.85rem">
+            <input type="number" value="${item.price || 0}" style="width:80px;font-size:0.85rem" step="0.01">
+            <button type="button" class="btn btn-sm btn-primary" onclick="saveOcrItem(${index})">💾</button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="cancelOcrEdit(${index})">❌</button>
+        </div>
+    `;
+    const ocrItemsHtml = [];
+    window.ocrItems.forEach((item, i) => {
+        if (i === index) {
+            ocrItemsHtml.push(editHtml);
+        } else {
+            ocrItemsHtml.push(`
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.25rem 0;border-bottom:1px solid var(--border-color)">
+                    <span>${item.name || 'Item'}</span>
+                    <span style="color:var(--text-secondary)">₹${item.price || 0}</span>
+                </div>
+            `);
+        }
+    });
+    document.getElementById("ocrItems").innerHTML = ocrItemsHtml.join("");
+}
+
+function saveOcrItem(index) {
+    const inputs = document.querySelectorAll(`#ocrItems input`);
+    const itemName = inputs[0].value.trim();
+    const itemPrice = parseFloat(inputs[1].value);
+    if (itemName && itemPrice > 0) {
+        window.ocrItems[index] = { 
+            name: itemName, 
+            price: itemPrice,
+            qty: window.ocrItems[index].qty || 1,
+            amount: itemPrice 
+        };
+        renderOcrItems();
+    }
+}
+
+function cancelOcrEdit(index) {
+    renderOcrItems();
+}
+
+// Merchant name editing
+function editMerchant() {
+    const currentMerchant = document.getElementById("ocrMerchant").innerText.replace("🏪 ", "");
+    document.getElementById("merchantInput").value = currentMerchant === "Unknown Merchant" ? "" : currentMerchant;
+    document.getElementById("merchantDisplay").style.display = "none";
+    document.getElementById("merchantEdit").style.display = "flex";
+}
+
+function saveMerchant() {
+    const newMerchant = document.getElementById("merchantInput").value.trim();
+    if (newMerchant) {
+        document.getElementById("ocrMerchant").innerText = "🏪 " + newMerchant;
+        // Also update the expense title
+        document.getElementById("title").value = newMerchant + " - Receipt";
+    }
+    document.getElementById("merchantDisplay").style.display = "block";
+    document.getElementById("merchantEdit").style.display = "none";
+}
+
+function cancelMerchantEdit() {
+    document.getElementById("merchantDisplay").style.display = "block";
+    document.getElementById("merchantEdit").style.display = "none";
+}
+</script>
+
 </body>
 </html>

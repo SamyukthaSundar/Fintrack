@@ -1,11 +1,14 @@
 package com.fintrack.service;
 
-import com.fintrack.dto.ExpenseCreateDto;
-import com.fintrack.model.Expense;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-import java.util.Optional;
+import com.fintrack.dto.ExpenseCreateDto;
+import com.fintrack.model.Expense;
 
 /**
  * ExpenseService Interface
@@ -18,4 +21,9 @@ public interface ExpenseService {
     List<Expense> findByGroupId(Long groupId);
     void deleteExpense(Long expenseId, Long requestingUserId);
     String extractTextFromReceipt(MultipartFile file);
+    
+    BigDecimal detectAmountFromOcr(String text);
+    String detectMerchantName(String ocrText);
+    List<Map<String, Object>> extractItems(String ocrText);
+    String extractDate(String ocrText);
 }

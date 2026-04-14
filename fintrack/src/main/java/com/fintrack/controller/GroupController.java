@@ -1,20 +1,29 @@
 package com.fintrack.controller;
 
-import com.fintrack.dto.GroupCreateDto;
-import com.fintrack.model.*;
-import com.fintrack.service.GroupService;
-import com.fintrack.service.UserService;
-import com.fintrack.service.impl.DebtSimplificationService;
-import jakarta.validation.Valid;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import com.fintrack.dto.GroupCreateDto;
+import com.fintrack.model.Group;
+import com.fintrack.model.GroupMember;
+import com.fintrack.model.User;
+import com.fintrack.service.GroupService;
+import com.fintrack.service.UserService;
+import com.fintrack.service.impl.DebtSimplificationService;
+
+import jakarta.validation.Valid;
 
 /**
  * GroupController — Owner: Saanvi Kakkar
@@ -99,4 +108,15 @@ public class GroupController {
         ra.addFlashAttribute("successMsg", "Member removed.");
         return "redirect:/groups/" + id;
     }
+    @PostMapping("/{id}/delete")
+public String deleteGroup(@PathVariable Long id, RedirectAttributes ra) {
+    User current = userService.getCurrentUser();
+    try {
+        groupService.deleteGroup(id, current.getId());
+        ra.addFlashAttribute("successMsg", "Group deleted successfully.");
+    } catch (Exception e) {
+        ra.addFlashAttribute("errorMsg", e.getMessage());
+    }
+    return "redirect:/groups";
+}
 }
