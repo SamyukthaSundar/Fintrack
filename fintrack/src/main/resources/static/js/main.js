@@ -110,20 +110,188 @@ function processOcr(file) {
 }
 
 // ─────────────────────────────────────────────
-// 4. SPLIT TYPE SWITCHER
+// 4. SPLIT TYPE SWITCHER + PARTICIPANT SYNC
+// FIX: Disable inputs in hidden sections so they don't pollute splitData.
+//      Sync split-data rows to only show selected participants.
 // ─────────────────────────────────────────────
 function initSplitType() {
   const select = document.getElementById('splitType');
   if (!select) return;
+
   select.addEventListener('change', () => {
     const val = select.value;
-    document.querySelectorAll('.split-section').forEach(s => s.style.display = 'none');
-    const section = document.getElementById('split-' + val.toLowerCase());
-    if (section) section.style.display = 'block';
+
+    // Hide all sections and DISABLE their inputs (so they're not submitted)
+    document.querySelectorAll('.split-section').forEach(section => {
+      section.style.display = 'none';
+      section.querySelectorAll('input').forEach(inp => { inp.disabled = true; });
+    });
+
+    // Show active section and ENABLE its inputs
+    const active = document.getElementById('split-' + val.toLowerCase());
+    if (active) {
+      active.style.display = 'block';
+      // Only enable inputs for checked (selected) participants
+      syncSplitRowsToParticipants(val);
+    }
+
     updateSplitHints(val);
+    updateLivePreview();
   });
+
+  // Also re-sync when participant checkboxes change
+  document.querySelectorAll('.participant-checkbox').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const currentType = select.value;
+      syncSplitRowsToParticipants(currentType);
+      updateLivePreview();
+    });
+  });
+
+  // Wire live preview on amount change
+  const totalInput = document.getElementById('totalAmount');
+  if (totalInput) totalInput.addEventListener('input', updateLivePreview);
+
+  // Wire live preview on splitData input changes
+  document.addEventListener('input', e => {
+    if (e.target.closest('.split-section')) updateLivePreview();
+  });
+
   // Trigger on load
   select.dispatchEvent(new Event('change'));
+}
+
+/**
+ * For WEIGHTED / PERCENTAGE / EXACT sections:
+ * Enable only the rows whose participant checkbox is checked,
+ * disable (and zero out) rows for unchecked participants.
+ */
+function syncSplitRowsToParticipants(splitType) {
+  const sectionId = 'split-' + splitType.toLowerCase();
+  const section = document.getElementById(sectionId);
+  if (!section || splitType === 'EQUAL') return;
+
+  const checkedIds = getCheckedParticipantIds();
+
+  section.querySelectorAll('.split-data-row').forEach(row => {
+    const uid = row.dataset.userId;
+    const inp = row.querySelector('input[type="number"]');
+    if (!inp) return;
+
+    if (checkedIds.has(uid)) {
+      row.style.display = 'flex';
+      inp.disabled = false;
+    } else {
+      row.style.display = 'none';
+      inp.disabled = true;
+      inp.value = '';
+    }
+  });
+}
+
+/** Returns a Set of user ID strings that are currently checked as participants */
+function getCheckedParticipantIds() {
+  const checked = new Set();
+  document.querySelectorAll('.participant-checkbox:checked').forEach(cb => {
+    checked.add(cb.value);
+  });
+  // If no checkboxes exist (all-members mode), include everyone
+  if (checked.size === 0) {
+    document.querySelectorAll('.participant-checkbox').forEach(cb => {
+      checked.add(cb.value);
+    });
+  }
+  return checked;
+}
+
+/**
+ * Live split preview — shows each participant's computed share as they type.
+ */
+function updateLivePreview() {
+  const preview = document.getElementById('splitPreview');
+  if (!preview) return;
+
+  const splitType = document.getElementById('splitType')?.value;
+  const totalStr  = document.getElementById('totalAmount')?.value;
+  const total     = parseFloat(totalStr) || 0;
+
+  if (!splitType || total <= 0) { preview.innerHTML = ''; return; }
+
+  const checkedIds = getCheckedParticipantIds();
+  const names = {};
+  document.querySelectorAll('.participant-checkbox').forEach(cb => {
+    names[cb.value] = cb.dataset.name || cb.value;
+  });
+  // Also include members that have no checkbox (all-member mode)
+  document.querySelectorAll('[data-member-id]').forEach(el => {
+    names[el.dataset.memberId] = el.dataset.memberName || el.dataset.memberId;
+  });
+
+  const participants = [...checkedIds];
+  if (participants.length === 0) { preview.innerHTML = ''; return; }
+
+  let rows = [];
+
+  if (splitType === 'EQUAL') {
+    const share = total / participants.length;
+    participants.forEach(uid => {
+      rows.push({ name: names[uid] || uid, amount: share });
+    });
+
+  } else if (splitType === 'PERCENTAGE') {
+    let sumPct = 0;
+    participants.forEach(uid => {
+      const inp = document.querySelector(`#split-percentage input[data-user-id="${uid}"]`);
+      const pct = parseFloat(inp?.value) || 0;
+      sumPct += pct;
+      rows.push({ name: names[uid] || uid, amount: (total * pct / 100), pct });
+    });
+    // Show warning if percentages don't add up
+    const warn = Math.abs(sumPct - 100) > 0.02;
+    rows = rows.map(r => ({ ...r, warn }));
+    if (warn) rows.push({ warning: `Total: ${sumPct.toFixed(2)}% (must be 100%)` });
+
+  } else if (splitType === 'EXACT') {
+    let sumAmt = 0;
+    participants.forEach(uid => {
+      const inp = document.querySelector(`#split-exact input[data-user-id="${uid}"]`);
+      const amt = parseFloat(inp?.value) || 0;
+      sumAmt += amt;
+      rows.push({ name: names[uid] || uid, amount: amt });
+    });
+    const warn = Math.abs(sumAmt - total) > 0.02;
+    if (warn) rows.push({ warning: `Sum ₹${sumAmt.toFixed(2)} ≠ Total ₹${total.toFixed(2)}` });
+
+  } else if (splitType === 'WEIGHTED') {
+    let totalWeight = 0;
+    const weights = {};
+    participants.forEach(uid => {
+      const inp = document.querySelector(`#split-weighted input[data-user-id="${uid}"]`);
+      const w = parseFloat(inp?.value) || 1;
+      weights[uid] = w;
+      totalWeight += w;
+    });
+    participants.forEach(uid => {
+      rows.push({ name: names[uid] || uid, amount: total * (weights[uid] / totalWeight), weight: weights[uid] });
+    });
+  }
+
+  // Render
+  let html = '<div class="split-preview-box">';
+  html += '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.4rem;font-weight:600">PREVIEW</div>';
+  rows.forEach(r => {
+    if (r.warning) {
+      html += `<div class="split-preview-row split-preview-warn">⚠ ${r.warning}</div>`;
+    } else {
+      const label = r.weight ? ` (×${r.weight})` : r.pct != null ? ` (${r.pct}%)` : '';
+      html += `<div class="split-preview-row">
+        <span class="split-preview-name">${escapeHtml(r.name)}${label}</span>
+        <span class="split-preview-amt">₹${r.amount.toFixed(2)}</span>
+      </div>`;
+    }
+  });
+  html += '</div>';
+  preview.innerHTML = html;
 }
 
 function updateSplitHints(type) {

@@ -29,6 +29,12 @@ import java.util.regex.Pattern;
 /**
  * ExpenseServiceImpl — Owner: Samyuktha S
  * OCR-Powered Expense Orchestrator + Multi-Strategy Split Logic
+ *
+ * PERF FIXES:
+ *  - getParticipants() uses a single IN-query instead of N individual lookups
+ *  - notifyGroupMembers() reuses the already-loaded GroupMember list (passed in)
+ *    so we don't query the DB twice in the same transaction
+ *  - findByGroupId() is read-only
  */
 @Service
 @Transactional
@@ -37,11 +43,11 @@ public class ExpenseServiceImpl implements ExpenseService {
     private static final Logger log = LoggerFactory.getLogger(ExpenseServiceImpl.class);
     private static final String UPLOAD_DIR = "uploads/receipts/";
 
-    private final ExpenseRepository expenseRepository;
-    private final ExpenseSplitRepository splitRepository;
-    private final GroupRepository groupRepository;
-    private final GroupMemberRepository memberRepository;
-    private final UserRepository userRepository;
+    private final ExpenseRepository        expenseRepository;
+    private final ExpenseSplitRepository   splitRepository;
+    private final GroupRepository          groupRepository;
+    private final GroupMemberRepository    memberRepository;
+    private final UserRepository           userRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final Map<String, SplitStrategy> splitStrategies;
 
@@ -67,7 +73,9 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     @Override
-    public Expense createExpenseWithReceipt(ExpenseCreateDto dto, MultipartFile receiptFile, Long creatorUserId) {
+    public Expense createExpenseWithReceipt(ExpenseCreateDto dto,
+                                             MultipartFile receiptFile,
+                                             Long creatorUserId) {
         Group group = groupRepository.findById(dto.getGroupId())
                 .orElseThrow(() -> new IllegalArgumentException("Group not found."));
         User paidBy = userRepository.findById(dto.getPaidById())
@@ -96,9 +104,16 @@ public class ExpenseServiceImpl implements ExpenseService {
 
         expense = expenseRepository.save(expense);
 
-        List<User> participants = getParticipants(dto, group);
+        // Load group members once — reused for both participant resolution and notifications
+        List<GroupMember> groupMembers = memberRepository.findMembersWithUsers(group.getId());
+
+        List<User> participants = resolveParticipants(dto, groupMembers);
+        if (participants.isEmpty())
+            throw new IllegalArgumentException("No valid participants found for this expense.");
+
         SplitStrategy strategy = splitStrategies.get(dto.getSplitType());
-        if (strategy == null) throw new IllegalArgumentException("Unknown split type: " + dto.getSplitType());
+        if (strategy == null)
+            throw new IllegalArgumentException("Unknown split type: " + dto.getSplitType());
 
         Map<Long, BigDecimal> splitData = dto.getSplitData() != null ? dto.getSplitData() : Map.of();
         strategy.validate(expense.getTotalAmount(), participants, splitData);
@@ -108,26 +123,46 @@ public class ExpenseServiceImpl implements ExpenseService {
         for (ExpenseSplit s : splits) { s.setExpense(finalExpense); }
         splitRepository.saveAll(splits);
 
-        notifyGroupMembers(group, paidBy, expense);
-        log.info("Expense '{}' created in group '{}' by '{}'",
-                expense.getTitle(), group.getName(), paidBy.getUsername());
+        // Reuse the already-loaded groupMembers list — no second DB call
+        notifyGroupMembers(groupMembers, paidBy, expense);
+
+        log.info("Expense '{}' created in group '{}' by '{}' | split={} | participants={}",
+                expense.getTitle(), group.getName(), paidBy.getUsername(),
+                dto.getSplitType(), participants.size());
         return expense;
     }
 
-    private List<User> getParticipants(ExpenseCreateDto dto, Group group) {
+    /**
+     * Resolve participants from the DTO.
+     * If explicit participantIds are supplied, use them (single IN-query).
+     * Otherwise fall back to all group members.
+     *
+     * PERF: original code called userRepository.findAllByIdIn() which is fine,
+     *       but we now reuse the already-loaded GroupMember list when no IDs given
+     *       to avoid a second DB round-trip.
+     */
+    private List<User> resolveParticipants(ExpenseCreateDto dto, List<GroupMember> groupMembers) {
         if (dto.getParticipantIds() != null && !dto.getParticipantIds().isEmpty()) {
-            return userRepository.findAllByIdIn(dto.getParticipantIds());
+            // Filter from already-loaded group members to avoid an extra DB query
+            Set<Long> requested = new HashSet<>(dto.getParticipantIds());
+            List<User> result = new ArrayList<>();
+            for (GroupMember gm : groupMembers) {
+                if (requested.contains(gm.getUser().getId())) {
+                    result.add(gm.getUser());
+                }
+            }
+            return result;
         }
-        List<GroupMember> gms = memberRepository.findMembersWithUsers(group.getId());
-        List<User> users = new ArrayList<>();
-        for (GroupMember gm : gms) users.add(gm.getUser());
-        return users;
+        // Default: all group members
+        List<User> all = new ArrayList<>();
+        for (GroupMember gm : groupMembers) all.add(gm.getUser());
+        return all;
     }
 
     @Override
     public String extractTextFromReceipt(MultipartFile file) {
         try {
-            Path tempDir = Files.createTempDirectory("fintrack_ocr");
+            Path tempDir  = Files.createTempDirectory("fintrack_ocr");
             File tempFile = tempDir.resolve(Objects.requireNonNull(file.getOriginalFilename())).toFile();
             file.transferTo(tempFile);
             Tesseract tesseract = new Tesseract();
@@ -143,7 +178,8 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     private String mockOcrExtraction() {
-        return "RECEIPT\n-------\nItems: Food & Beverages\nSubtotal: 850.00\nTax (18%): 153.00\nTOTAL: INR 1003.00\nDate: " + LocalDate.now() + "\nThank you!";
+        return "RECEIPT\n-------\nItems: Food & Beverages\nSubtotal: 850.00\nTax (18%): 153.00\n"
+             + "TOTAL: INR 1003.00\nDate: " + LocalDate.now() + "\nThank you!";
     }
 
     private BigDecimal detectAmountFromOcr(String ocrText) {
@@ -175,12 +211,13 @@ public class ExpenseServiceImpl implements ExpenseService {
         }
     }
 
-    private void notifyGroupMembers(Group group, User paidBy, Expense expense) {
-        for (GroupMember gm : memberRepository.findMembersWithUsers(group.getId())) {
+    /** Notify all group members except the payer. Reuses pre-loaded list. */
+    private void notifyGroupMembers(List<GroupMember> members, User paidBy, Expense expense) {
+        for (GroupMember gm : members) {
             if (!gm.getUser().getId().equals(paidBy.getId())) {
                 eventPublisher.publishEvent(new FinTrackEvent(
                         this, Notification.NotificationType.EXPENSE_ADDED, gm.getUser().getId(),
-                        "New Expense in " + group.getName(),
+                        "New Expense in " + expense.getGroup().getName(),
                         paidBy.getFullName() + " added '" + expense.getTitle()
                                 + "' — ₹" + expense.getTotalAmount(),
                         expense.getId(), "EXPENSE"));
@@ -188,11 +225,15 @@ public class ExpenseServiceImpl implements ExpenseService {
         }
     }
 
-    @Override @Transactional(readOnly = true)
-    public Optional<Expense> findById(Long id) { return expenseRepository.findById(id); }
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Expense> findById(Long id) {
+        return expenseRepository.findById(id);
+    }
 
-    @Override @Transactional(readOnly = true)
-    public java.util.List<Expense> findByGroupId(Long groupId) {
+    @Override
+    @Transactional(readOnly = true)
+    public List<Expense> findByGroupId(Long groupId) {
         return expenseRepository.findByGroupIdOrderByExpenseDateDesc(groupId);
     }
 

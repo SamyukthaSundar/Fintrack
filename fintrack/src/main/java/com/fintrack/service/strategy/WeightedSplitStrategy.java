@@ -12,6 +12,10 @@ import java.util.Map;
 
 /**
  * WeightedSplitStrategy — Owner: Samyuktha S
+ *
+ * FIX: validate() now checks every participant has a positive weight entry.
+ *      computeSplits() only sums weights for actual participants (not all of splitData).
+ *      Last participant receives the remainder to avoid rounding gaps.
  */
 @Component("WEIGHTED")
 public class WeightedSplitStrategy implements SplitStrategy {
@@ -20,7 +24,13 @@ public class WeightedSplitStrategy implements SplitStrategy {
     public List<ExpenseSplit> computeSplits(BigDecimal totalAmount,
                                              List<User> participants,
                                              Map<Long, BigDecimal> splitData) {
-        BigDecimal totalWeight = splitData.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Sum only the weights of actual participants, not all keys in splitData
+        BigDecimal totalWeight = BigDecimal.ZERO;
+        for (User u : participants) {
+            totalWeight = totalWeight.add(
+                splitData.getOrDefault(u.getId(), BigDecimal.ONE));
+        }
+
         List<ExpenseSplit> splits = new ArrayList<>();
         BigDecimal assigned = BigDecimal.ZERO;
 
@@ -29,6 +39,7 @@ public class WeightedSplitStrategy implements SplitStrategy {
             BigDecimal weight = splitData.getOrDefault(user.getId(), BigDecimal.ONE);
             BigDecimal amt;
             if (i == participants.size() - 1) {
+                // Last participant absorbs any rounding remainder
                 amt = totalAmount.subtract(assigned);
             } else {
                 amt = totalAmount.multiply(weight)
@@ -45,10 +56,20 @@ public class WeightedSplitStrategy implements SplitStrategy {
     }
 
     @Override
-    public void validate(BigDecimal totalAmount, List<User> participants, Map<Long, BigDecimal> splitData) {
-        boolean anyNonPositive = splitData.values().stream()
-                .anyMatch(v -> v.compareTo(BigDecimal.ZERO) <= 0);
-        if (anyNonPositive)
-            throw new IllegalArgumentException("All weights must be positive values.");
+    public void validate(BigDecimal totalAmount, List<User> participants,
+                         Map<Long, BigDecimal> splitData) {
+        if (participants == null || participants.isEmpty())
+            throw new IllegalArgumentException("Participants list cannot be empty.");
+
+        for (User u : participants) {
+            BigDecimal weight = splitData.get(u.getId());
+            if (weight == null)
+                throw new IllegalArgumentException(
+                    "Missing weight for participant: " + u.getFullName()
+                    + ". Please enter a weight for every selected participant.");
+            if (weight.compareTo(BigDecimal.ZERO) <= 0)
+                throw new IllegalArgumentException(
+                    "Weight must be a positive value for: " + u.getFullName());
+        }
     }
 }
