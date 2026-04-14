@@ -109,14 +109,15 @@ public class GroupController {
         return "redirect:/groups/" + id;
     }
     @PostMapping("/{id}/delete")
-public String deleteGroup(@PathVariable Long id, RedirectAttributes ra) {
-    User current = userService.getCurrentUser();
-    try {
-        groupService.deleteGroup(id, current.getId());
-        ra.addFlashAttribute("successMsg", "Group deleted successfully.");
-    } catch (Exception e) {
-        ra.addFlashAttribute("errorMsg", e.getMessage());
+    public String deleteGroup(@PathVariable Long id, RedirectAttributes ra) {
+        User current = userService.getCurrentUser();
+        try {
+            groupService.deleteGroup(id, current.getId());
+            ra.addFlashAttribute("successMsg", "Group deleted successfully.");
+        } catch (IllegalStateException e) {
+            ra.addFlashAttribute("errorMsg", e.getMessage());
+            return "redirect:/groups/" + id;
+        }
+        return "redirect:/groups";
     }
-    return "redirect:/groups";
-}
 }
