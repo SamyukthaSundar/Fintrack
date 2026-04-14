@@ -109,6 +109,9 @@ public class GroupServiceImpl implements GroupService {
     public void deleteGroup(Long groupId, Long requestingUserId) {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found."));
+        if (!group.getCreatedBy().getId().equals(requestingUserId)) {
+            throw new IllegalStateException("Only the group creator can delete this group.");
+        }
         group.setIsActive(false);
         groupRepository.save(group);
     }

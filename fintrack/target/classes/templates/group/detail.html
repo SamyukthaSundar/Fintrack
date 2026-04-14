@@ -38,6 +38,14 @@
       <a th:href="@{/expenses/group/{id}(id=${group.id})}" class="btn btn-primary">💸 Add Expense</a>
       <a th:href="@{/settlements/group/{id}(id=${group.id})}" class="btn btn-secondary">✓ Settlements</a>
       <a th:href="@{/analytics/group/{id}(id=${group.id})}" class="btn btn-ghost">📊 Analytics</a>
+
+      <form th:if="${group.createdBy.id == currentUser.id}"
+            method="post"
+            th:action="@{/groups/{id}/delete(id=${group.id})}"
+            onsubmit="return confirm('Delete this group? This cannot be undone.')">
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+          <button type="submit" class="btn btn-danger btn-sm">🗑 Delete Group</button>
+      </form>
     </div>
   </div>
 
