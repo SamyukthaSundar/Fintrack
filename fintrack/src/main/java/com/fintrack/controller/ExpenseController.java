@@ -119,6 +119,80 @@ public class ExpenseController {
         return "redirect:/expenses/group/" + groupId;
     }
 
+    @GetMapping("/{expenseId}/edit")
+    public String editExpenseForm(@PathVariable Long expenseId, Model model) {
+        User current = userService.getCurrentUser();
+        Expense expense = expenseService.findById(expenseId)
+                .orElseThrow(() -> new IllegalArgumentException("Expense not found."));
+        
+        // Only owner can edit
+        if (!expense.getPaidBy().getId().equals(current.getId())) {
+            throw new IllegalArgumentException("Only the expense owner can edit this expense.");
+        }
+        
+        Group group = expense.getGroup();
+        model.addAttribute("expense", expense);
+        model.addAttribute("group", group);
+        model.addAttribute("members", groupService.getMembers(group.getId()));
+        model.addAttribute("currentUser", current);
+        model.addAttribute("splitTypes", Expense.SplitType.values());
+        model.addAttribute("categories", Expense.Category.values());
+        return "expense/edit";
+    }
+
+    @PostMapping("/{expenseId}/edit")
+    public String updateExpense(@PathVariable Long expenseId,
+                                @RequestParam Long groupId,
+                                @RequestParam String title,
+                                @RequestParam(required = false) String description,
+                                @RequestParam BigDecimal totalAmount,
+                                @RequestParam String splitType,
+                                @RequestParam String category,
+                                @RequestParam(required = false) String expenseDate,
+                                @RequestParam Long paidById,
+                                @RequestParam(required = false) List<Long> participantIds,
+                                HttpServletRequest request,
+                                RedirectAttributes ra) {
+        User current = userService.getCurrentUser();
+
+        // Parse splitData manually from request params: splitData[userId] = value
+        Map<Long, BigDecimal> splitData = new HashMap<>();
+        Map<String, String[]> params = request.getParameterMap();
+        for (Map.Entry<String, String[]> entry : params.entrySet()) {
+            String key = entry.getKey();
+            if (key.startsWith("splitData[") && key.endsWith("]")) {
+                try {
+                    Long userId = Long.parseLong(key.substring(10, key.length() - 1));
+                    String val = entry.getValue()[0];
+                    if (val != null && !val.trim().isEmpty()) {
+                        splitData.put(userId, new BigDecimal(val.trim()));
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+
+        ExpenseCreateDto dto = new ExpenseCreateDto();
+        dto.setGroupId(groupId);
+        dto.setPaidById(paidById);
+        dto.setTitle(title);
+        dto.setDescription(description);
+        dto.setTotalAmount(totalAmount);
+        dto.setSplitType(splitType);
+        dto.setCategory(category);
+        dto.setExpenseDate(expenseDate != null && !expenseDate.isEmpty()
+                ? LocalDate.parse(expenseDate) : LocalDate.now());
+        dto.setParticipantIds(participantIds);
+        dto.setSplitData(splitData.isEmpty() ? null : splitData);
+
+        try {
+            Expense expense = expenseService.updateExpense(expenseId, dto, current.getId());
+            ra.addFlashAttribute("successMsg", "Expense '" + expense.getTitle() + "' updated!");
+        } catch (Exception e) {
+            ra.addFlashAttribute("errorMsg", "Error: " + e.getMessage());
+        }
+        return "redirect:/expenses/group/" + groupId;
+    }
+
     @PostMapping("/{expenseId}/delete")
     public String deleteExpense(@PathVariable Long expenseId,
                                 @RequestParam Long groupId,

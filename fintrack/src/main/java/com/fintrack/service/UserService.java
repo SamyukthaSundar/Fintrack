@@ -18,9 +18,11 @@ public interface UserService {
     Optional<User> findByUsername(String username);
     Optional<User> findById(Long id);
     List<User> findAllActive();
+    List<User> findAllInactive();
     User getCurrentUser();
     User updateProfile(Long userId, String fullName, String email);
     void deactivateUser(Long userId);
+    void reactivateUser(Long userId);
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
 }

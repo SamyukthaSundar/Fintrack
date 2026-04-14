@@ -26,6 +26,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.isActive = true ORDER BY u.fullName")
     List<User> findAllActiveUsers();
 
+    @Query("SELECT u FROM User u WHERE u.isActive = false ORDER BY u.fullName")
+    List<User> findAllInactiveUsers();
+
     @Query("SELECT u FROM User u WHERE u.id IN :ids")
     List<User> findAllByIdIn(List<Long> ids);
 }

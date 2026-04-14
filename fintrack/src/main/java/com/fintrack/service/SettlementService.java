@@ -16,6 +16,7 @@ public interface SettlementService {
     Settlement submit(Long settlementId, String paymentRef, PaymentMethod method, String notes, Long requestingUserId);
     Settlement verify(Long settlementId, Long requestingUserId);
     Settlement reject(Long settlementId, String reason, Long requestingUserId);
+    void delete(Long settlementId, Long requestingUserId);
     Optional<Settlement> findById(Long id);
     List<Settlement> findByGroupId(Long groupId);
     List<Settlement> findPendingForPayee(Long payeeId);

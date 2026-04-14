@@ -59,14 +59,19 @@
                 th:text="'₹' + ${e.totalAmount.toPlainString()}">₹0</td>
             <td><span class="badge badge-info" th:text="${e.splitType}">EQUAL</span></td>
             <td>
-              <form method="post"
-                    th:action="@{/expenses/{id}/delete(id=${e.id})}"
-                    style="display:inline">
-                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                <input type="hidden" name="groupId" th:value="${group.id}"/>
-                <button type="submit" class="btn btn-danger btn-sm"
-                        data-confirm="Delete this expense?">✕</button>
-              </form>
+              <!-- Edit/Delete buttons only shown to expense owner -->
+              <div th:if="${e.paidBy.id == currentUser.id}" style="display:flex;gap:0.4rem">
+                <a th:href="@{/expenses/{id}/edit(id=${e.id})}" class="btn btn-sm btn-ghost" title="Edit">✏️</a>
+                <form method="post"
+                      th:action="@{/expenses/{id}/delete(id=${e.id})}"
+                      style="display:inline">
+                  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                  <input type="hidden" name="groupId" th:value="${group.id}"/>
+                  <button type="submit" class="btn btn-danger btn-sm"
+                          data-confirm="Delete this expense?">✕</button>
+                </form>
+              </div>
+              <span th:unless="${e.paidBy.id == currentUser.id}" style="color:var(--text-muted);font-size:0.75rem">—</span>
             </td>
           </tr>
           <tr th:if="${expenses.empty}">

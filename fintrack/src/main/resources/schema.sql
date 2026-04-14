@@ -94,14 +94,15 @@ CREATE TABLE IF NOT EXISTS expenses (
 -- Owner: Samyuktha S
 -- ============================================================
 CREATE TABLE IF NOT EXISTS expense_splits (
-    id         BIGINT AUTO_INCREMENT PRIMARY KEY,
-    expense_id BIGINT NOT NULL,
-    user_id    BIGINT NOT NULL,
-    amount     DECIMAL(12, 2) NOT NULL,
-    percentage DECIMAL(5, 2),
-    weight     DECIMAL(5, 2),
-    is_paid    BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    expense_id      BIGINT NOT NULL,
+    user_id         BIGINT NOT NULL,
+    amount          DECIMAL(12, 2) NOT NULL,
+    percentage      DECIMAL(5, 2),
+    weight          DECIMAL(5, 2),
+    is_paid         BOOLEAN NOT NULL DEFAULT FALSE,
+    settled_amount  DECIMAL(12, 2) DEFAULT 0.00,
+    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_split_expense FOREIGN KEY (expense_id) REFERENCES expenses(id)  ON DELETE CASCADE,
     CONSTRAINT fk_split_user    FOREIGN KEY (user_id)    REFERENCES users(id)     ON DELETE RESTRICT,
     UNIQUE KEY uq_expense_user_split (expense_id, user_id),

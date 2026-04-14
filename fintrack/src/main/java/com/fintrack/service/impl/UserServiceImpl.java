@@ -61,6 +61,9 @@ public class UserServiceImpl implements UserService {
     public List<User> findAllActive() { return userRepository.findAllActiveUsers(); }
 
     @Override @Transactional(readOnly = true)
+    public List<User> findAllInactive() { return userRepository.findAllInactiveUsers(); }
+
+    @Override @Transactional(readOnly = true)
     public User getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return userRepository.findByUsername(auth.getName())
@@ -83,6 +86,15 @@ public class UserServiceImpl implements UserService {
         user.setIsActive(false);
         userRepository.save(user);
         log.info("User {} deactivated.", user.getUsername());
+    }
+
+    @Override
+    public void reactivateUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        user.setIsActive(true);
+        userRepository.save(user);
+        log.info("User {} reactivated.", user.getUsername());
     }
 
     @Override @Transactional(readOnly = true)

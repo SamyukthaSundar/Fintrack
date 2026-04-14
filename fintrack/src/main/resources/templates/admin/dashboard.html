@@ -41,9 +41,9 @@
     </div>
   </div>
 
-  <!-- User Management -->
+  <!-- Active Users -->
   <div class="card mb-3">
-    <div class="card-header"><span class="card-title">User Management</span></div>
+    <div class="card-header"><span class="card-title">Active Users</span></div>
     <div class="table-wrapper">
       <table>
         <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
@@ -54,18 +54,44 @@
               <div style="font-size:0.75rem;color:var(--text-muted)" th:text="'@' + ${u.username}">@user</div>
             </td>
             <td style="font-size:0.8rem;color:var(--text-secondary)" th:text="${u.email}">Email</td>
-            <td><span th:class="${'badge ' + (u.role.name() == 'ADMIN' ? 'badge-warning' : 'badge-muted')}"
-                      th:text="${u.role}">USER</span></td>
-            <td><span th:class="${'badge ' + (u.isActive ? 'badge-success' : 'badge-danger')}"
-                      th:text="${u.isActive ? 'ACTIVE' : 'INACTIVE'}">ACTIVE</span></td>
-            <td style="font-size:0.78rem;color:var(--text-muted)"
-                th:text="${#temporals.format(u.createdAt, 'dd MMM yyyy')}">Date</td>
+            <td><span th:class="${'badge ' + (u.role.name() == 'ADMIN' ? 'badge-warning' : 'badge-muted')}" th:text="${u.role}">USER</span></td>
+            <td><span class="badge badge-success" th:text="'ACTIVE'">ACTIVE</span></td>
+            <td style="font-size:0.78rem;color:var(--text-muted)" th:text="${#temporals.format(u.createdAt, 'dd MMM yyyy')}">Date</td>
             <td>
-              <form method="post" th:action="@{/admin/users/{id}/deactivate(id=${u.id})}" style="display:inline"
-                    th:if="${u.isActive and u.role.name() != 'ADMIN'}">
+              <form method="post" th:action="@{/admin/users/{id}/deactivate(id=${u.id})}" style="display:inline" th:if="${u.role.name() != 'ADMIN'}">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                <button type="submit" class="btn btn-danger btn-sm"
-                        data-confirm="Deactivate this user?">Deactivate</button>
+                <button type="submit" class="btn btn-danger btn-sm" data-confirm="Deactivate this user?">Deactivate</button>
+              </form>
+            </td>
+          </tr>
+          <tr th:if="${allUsers.isEmpty()}">
+            <td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem">No active users</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Deactivated Users -->
+  <div class="card mb-3" th:if="${!inactiveUsers.isEmpty()}">
+    <div class="card-header"><span class="card-title" style="color:var(--text-muted)">Deactivated Users</span></div>
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody>
+          <tr th:each="u : ${inactiveUsers}" style="opacity:0.7">
+            <td>
+              <div style="font-weight:600;font-size:0.875rem;color:var(--text-muted)" th:text="${u.fullName}">Name</div>
+              <div style="font-size:0.75rem;color:var(--text-muted)" th:text="'@' + ${u.username}">@user</div>
+            </td>
+            <td style="font-size:0.8rem;color:var(--text-muted)" th:text="${u.email}">Email</td>
+            <td><span th:class="${'badge ' + (u.role.name() == 'ADMIN' ? 'badge-warning' : 'badge-muted')}" th:text="${u.role}">USER</span></td>
+            <td><span class="badge badge-danger" th:text="'INACTIVE'">INACTIVE</span></td>
+            <td style="font-size:0.78rem;color:var(--text-muted)" th:text="${#temporals.format(u.createdAt, 'dd MMM yyyy')}">Date</td>
+            <td>
+              <form method="post" th:action="@{/admin/users/{id}/reactivate(id=${u.id})}" style="display:inline">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button type="submit" class="btn btn-success btn-sm" data-confirm="Reactivate this user?">Reactivate</button>
               </form>
             </td>
           </tr>

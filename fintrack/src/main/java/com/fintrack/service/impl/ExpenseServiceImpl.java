@@ -156,6 +156,68 @@ public class ExpenseServiceImpl implements ExpenseService {
         return expense;
     }
 
+    @Override
+    public Expense updateExpense(Long expenseId, ExpenseCreateDto dto, Long requestingUserId) {
+        Expense expense = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new IllegalArgumentException("Expense not found."));
+        
+        // Only the owner (paidBy) can edit the expense
+        if (!expense.getPaidBy().getId().equals(requestingUserId)) {
+            throw new IllegalArgumentException("Only the expense owner can edit this expense.");
+        }
+
+        Group group = groupRepository.findById(dto.getGroupId())
+                .orElseThrow(() -> new IllegalArgumentException("Group not found."));
+        User paidBy = userRepository.findById(dto.getPaidById())
+                .orElseThrow(() -> new IllegalArgumentException("Payer not found."));
+
+        // Update expense fields
+        expense.setPaidBy(paidBy);
+        expense.setTitle(dto.getTitle());
+        expense.setDescription(dto.getDescription());
+        expense.setTotalAmount(dto.getTotalAmount());
+        expense.setSplitType(Expense.SplitType.valueOf(dto.getSplitType()));
+        expense.setCategory(Expense.Category.valueOf(dto.getCategory()));
+        expense.setExpenseDate(dto.getExpenseDate() != null ? dto.getExpenseDate() : LocalDate.now());
+
+        // Load group members for participant resolution
+        List<GroupMember> groupMembers = memberRepository.findMembersWithUsers(group.getId());
+        List<User> participants = resolveParticipants(dto, groupMembers);
+        
+        if (participants.isEmpty()) {
+            throw new IllegalArgumentException("No valid participants found for this expense.");
+        }
+
+        // Delete old splits - use orphanRemoval by clearing and saving first
+        expense.getSplits().clear();
+        expense = expenseRepository.save(expense); // This triggers orphanRemoval delete
+        expenseRepository.flush(); // Ensure delete is executed before insert
+
+        // Recalculate splits with new data
+        SplitStrategy strategy = splitStrategies.get(dto.getSplitType());
+        if (strategy == null) {
+            throw new IllegalArgumentException("Unknown split type: " + dto.getSplitType());
+        }
+
+        Map<Long, BigDecimal> splitData = dto.getSplitData() != null ? dto.getSplitData() : Map.of();
+        strategy.validate(expense.getTotalAmount(), participants, splitData);
+        List<ExpenseSplit> splits = strategy.computeSplits(expense.getTotalAmount(), participants, splitData);
+
+        // Set expense reference for new splits and save
+        for (ExpenseSplit s : splits) { 
+            s.setExpense(expense); 
+        }
+        splits = splitRepository.saveAll(splits);
+        expense.getSplits().addAll(splits);
+
+        // Final save of updated expense
+        expense = expenseRepository.save(expense);
+
+        log.info("Expense '{}' updated in group '{}' by '{}' | split={}",
+                expense.getTitle(), group.getName(), paidBy.getUsername(), dto.getSplitType());
+        return expense;
+    }
+
     /**
      * Resolve participants from the DTO.
      * If explicit participantIds are supplied, use them (single IN-query).
@@ -495,6 +557,12 @@ public class ExpenseServiceImpl implements ExpenseService {
     public void deleteExpense(Long expenseId, Long requestingUserId) {
         Expense expense = expenseRepository.findById(expenseId)
                 .orElseThrow(() -> new IllegalArgumentException("Expense not found."));
+        
+        // Only the owner (paidBy) can delete the expense
+        if (!expense.getPaidBy().getId().equals(requestingUserId)) {
+            throw new IllegalArgumentException("Only the expense owner can delete this expense.");
+        }
+        
         expenseRepository.delete(expense);
         log.info("Expense {} deleted by user {}", expenseId, requestingUserId);
     }

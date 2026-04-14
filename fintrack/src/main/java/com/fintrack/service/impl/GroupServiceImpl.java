@@ -25,15 +25,18 @@ public class GroupServiceImpl implements GroupService {
     private final GroupRepository groupRepository;
     private final GroupMemberRepository memberRepository;
     private final UserRepository userRepository;
+    private final ExpenseRepository expenseRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GroupServiceImpl(GroupRepository groupRepository,
                              GroupMemberRepository memberRepository,
                              UserRepository userRepository,
+                             ExpenseRepository expenseRepository,
                              ApplicationEventPublisher eventPublisher) {
         this.groupRepository = groupRepository;
         this.memberRepository = memberRepository;
         this.userRepository   = userRepository;
+        this.expenseRepository = expenseRepository;
         this.eventPublisher   = eventPublisher;
     }
 
@@ -112,8 +115,18 @@ public class GroupServiceImpl implements GroupService {
         if (!group.getCreatedBy().getId().equals(requestingUserId)) {
             throw new IllegalStateException("Only the group creator can delete this group.");
         }
-        group.setIsActive(false);
-        groupRepository.save(group);
+        
+        // Delete all expenses first (with their splits via cascade)
+        List<Expense> expenses = expenseRepository.findByGroupIdOrderByExpenseDateDesc(groupId);
+        expenseRepository.deleteAll(expenses);
+        
+        // Delete all group members
+        List<GroupMember> members = memberRepository.findByGroupId(groupId);
+        memberRepository.deleteAll(members);
+        
+        // Finally delete the group
+        groupRepository.delete(group);
+        log.info("Group '{}' and all its expenses deleted by user {}", group.getName(), requestingUserId);
     }
 
     @Override @Transactional(readOnly = true)

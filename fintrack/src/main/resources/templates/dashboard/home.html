@@ -46,22 +46,75 @@
   <!-- Stats Row -->
   <div class="four-col mb-3">
     <div class="stat-card">
+      <div class="stat-icon">👥</div>
       <div class="stat-label">Your Groups</div>
       <div class="stat-value" th:text="${groups.size()}">0</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Notifications</div>
-      <div class="stat-value" th:text="${unreadCount}">0</div>
+    <div class="stat-card owe" th:class="${totalOwed.compareTo(T(java.math.BigDecimal).ZERO) > 0} ? 'stat-card owe' : 'stat-card'">
+      <div class="stat-icon">💸</div>
+      <div class="stat-label">You Owe</div>
+      <div class="stat-value" th:text="'₹' + ${totalOwed}">₹0</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Account</div>
-      <div class="stat-value" style="font-size:1.1rem;text-transform:uppercase" th:text="${user.role}">USER</div>
+    <div class="stat-card owed" th:class="${totalOwedToMe.compareTo(T(java.math.BigDecimal).ZERO) > 0} ? 'stat-card owed' : 'stat-card'">
+      <div class="stat-icon">💰</div>
+      <div class="stat-label">Owed to You</div>
+      <div class="stat-value" th:text="'₹' + ${totalOwedToMe}">₹0</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Member Since</div>
-      <div class="stat-value" style="font-size:1rem"
-           th:text="${#temporals.format(user.createdAt, 'MMM yyyy')}">—</div>
+    <div class="stat-card"
+         th:class="${netBalance.compareTo(T(java.math.BigDecimal).ZERO) >= 0} ? 'stat-card balance-positive' : 'stat-card balance-negative'">
+      <div class="stat-icon">⚖️</div>
+      <div class="stat-label">Net Balance</div>
+      <div class="stat-value" th:text="${netBalance.compareTo(T(java.math.BigDecimal).ZERO) >= 0} ? '+' + ${netBalance} : ${netBalance}">0</div>
     </div>
+  </div>
+
+  <!-- Debt Summary with Expense Details -->
+  <div th:if="${!expenseLevelDebts.isEmpty()}" class="card mb-3">
+    <div class="card-header">
+      <span class="card-title">💰 Outstanding Debts</span>
+    </div>
+    <!-- Header Row -->
+    <div class="debt-row" style="background:var(--bg-secondary);border-bottom:2px solid var(--border-color);padding:0.75rem 1.25rem;">
+      <div class="debt-group" style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);">Group / Bill</div>
+      <div class="debt-person" style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);">Person</div>
+      <div class="debt-amount" style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);text-align:right;">Amount</div>
+      <div class="debt-status" style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);">Status</div>
+      <div class="debt-action" style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);text-align:right;">Action</div>
+    </div>
+    <!-- Debt Rows with Expense Names -->
+    <div th:each="debt : ${expenseLevelDebts}" class="debt-row">
+      <div class="debt-group">
+        <a th:href="@{/groups/{id}(id=${debt.group.id})}" class="group-link" th:text="${debt.group.name}">Group</a>
+        <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:0.15rem;" th:text="'🧾 ' + ${debt.expenseTitle}">Bill Name</div>
+      </div>
+      <div class="debt-person">
+        <span th:if="${debt.type == 'OWE'}" th:text="${debt.payee.fullName}" style="font-weight:600;">Payee</span>
+        <span th:if="${debt.type == 'OWED'}" th:text="${debt.payer.fullName}" style="font-weight:600;">Payer</span>
+      </div>
+      <div class="debt-amount">
+        <span class="debt-amount-value" th:class="${debt.type == 'OWE'} ? 'debt-amount-value owe' : 'debt-amount-value owed'"
+              th:text="'₹' + ${debt.amount}">₹0</span>
+      </div>
+      <div class="debt-status">
+        <span th:if="${debt.type == 'OWE'}" class="badge-status owe">You Owe</span>
+        <span th:if="${debt.type == 'OWED'}" class="badge-status owed">Owes You</span>
+      </div>
+      <div class="debt-action">
+        <a th:if="${debt.type == 'OWE'}" 
+           th:href="@{/settlements/group/{id}(id=${debt.group.id})}" 
+           class="btn btn-settle btn-sm">Settle Now</a>
+        <span th:if="${debt.type == 'OWED'}" class="btn-waiting" style="font-size:0.75rem;padding:0.4rem 0.75rem;border-radius:99px;display:inline-flex;align-items:center;gap:0.4rem;">
+          <span>⏳</span> Waiting
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- No Debts Message -->
+  <div th:if="${expenseLevelDebts.isEmpty()}" class="card mb-3" style="text-align:center;padding:1.5rem">
+    <div style="font-size:2rem;margin-bottom:0.5rem">✅</div>
+    <div style="color:var(--neon-green);font-weight:600">All settled up!</div>
+    <div style="font-size:0.8rem;color:var(--text-muted)">You have no outstanding debts across all groups</div>
   </div>
 
   <!-- Groups Grid -->

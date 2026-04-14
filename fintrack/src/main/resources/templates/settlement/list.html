@@ -48,10 +48,52 @@
     </div>
   </div>
 
-  <!-- Initiate New Settlement -->
-  <div class="card mb-3">
-    <div class="card-header"><span class="card-title">Initiate Settlement</span></div>
-    <form method="post" th:action="@{/settlements/initiate}" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end">
+  <!-- Quick Settle: Who You Owe -->
+  <div th:if="${!myDebts.isEmpty()}" class="card mb-3" style="border-color:var(--neon-green)">
+    <div class="card-header">
+      <span class="card-title" style="color:var(--neon-green)">💰 Quick Settle — Your Debts</span>
+    </div>
+    <div th:each="debt : ${myDebts}" class="debt-card" style="display:flex;align-items:center;gap:1rem;padding:0.75rem;border-bottom:1px solid var(--border-color)">
+      <!-- You owe someone -->
+      <div th:if="${debt.payer().id == currentUser.id}" style="display:flex;align-items:center;gap:1rem;flex:1">
+        <div style="flex:1">
+          <div style="font-size:0.75rem;color:var(--text-muted)">You owe</div>
+          <div style="font-weight:600" th:text="${debt.payee().fullName}">Payee</div>
+        </div>
+        <div class="debt-amount" style="color:var(--neon-red)" th:text="'₹' + ${debt.amount().toPlainString()}">₹0</div>
+        <form method="post" th:action="@{/settlements/initiate}" style="display:inline">
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+          <input type="hidden" name="groupId" th:value="${group.id}"/>
+          <input type="hidden" name="payeeId" th:value="${debt.payee().id}"/>
+          <input type="hidden" name="amount" th:value="${debt.amount()}"/>
+          <button type="submit" class="btn btn-primary btn-sm">Settle Now →</button>
+        </form>
+      </div>
+      <!-- Someone owes you -->
+      <div th:if="${debt.payee().id == currentUser.id}" style="display:flex;align-items:center;gap:1rem;flex:1">
+        <div style="flex:1">
+          <div style="font-size:0.75rem;color:var(--text-muted)">Owes you</div>
+          <div style="font-weight:600" th:text="${debt.payer().fullName}">Payer</div>
+        </div>
+        <div class="debt-amount" style="color:var(--neon-green)" th:text="'₹' + ${debt.amount().toPlainString()}">₹0</div>
+        <span class="badge badge-muted">Waiting for payment</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- No Debts Message -->
+  <div th:if="${myDebts.isEmpty()}" class="card mb-3" style="text-align:center;padding:1.5rem">
+    <div style="font-size:2rem;margin-bottom:0.5rem">✅</div>
+    <div style="color:var(--neon-green);font-weight:600">All settled up!</div>
+    <div style="font-size:0.8rem;color:var(--text-muted)">You have no pending debts in this group</div>
+  </div>
+
+  <!-- Manual Initiate (hidden by default, shown on toggle) -->
+  <details class="card mb-3">
+    <summary class="card-header" style="cursor:pointer;list-style:none">
+      <span class="card-title">+ Manual Settlement Entry</span>
+    </summary>
+    <form method="post" th:action="@{/settlements/initiate}" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;padding:1rem">
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
       <input type="hidden" name="groupId" th:value="${group.id}"/>
       <div class="form-group" style="margin:0;min-width:160px">
@@ -70,7 +112,7 @@
       </div>
       <button type="submit" class="btn btn-primary">Initiate →</button>
     </form>
-  </div>
+  </details>
 
   <!-- Pending Verification (for payee) -->
   <div th:unless="${pendingVerification.empty}" class="card mb-3"
@@ -129,9 +171,15 @@
                 th:text="${#temporals.format(s.initiatedAt, 'dd MMM yyyy')}">Date</td>
             <td>
               <!-- Submit button if PENDING and current user is payer -->
-              <div th:if="${s.status.name() == 'PENDING' and s.payer.id == currentUser.id}">
+              <div th:if="${s.status.name() == 'PENDING' and s.payer.id == currentUser.id}" style="display:flex;gap:0.5rem">
                 <button class="btn btn-secondary btn-sm" onclick="showSubmitModal(this)"
                         th:data-id="${s.id}" th:data-group="${group.id}">Submit Proof</button>
+                <form method="post" th:action="@{/settlements/{id}/delete(id=${s.id})}" style="display:inline"
+                      onsubmit="return confirm('Delete this settlement?');">
+                  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                  <input type="hidden" name="groupId" th:value="${group.id}"/>
+                  <button type="submit" class="btn btn-danger btn-sm" title="Delete">✕</button>
+                </form>
               </div>
               <span th:if="${s.status.name() == 'VERIFIED'}" style="font-size:0.75rem;color:var(--text-muted)"
                     th:text="'by ' + ${s.verifiedBy?.fullName ?: '—'}"></span>

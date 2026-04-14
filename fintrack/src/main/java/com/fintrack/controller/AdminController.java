@@ -32,7 +32,8 @@ public class AdminController {
         model.addAttribute("actionsToday",
                 auditService.countSince(LocalDateTime.now().withHour(0).withMinute(0)));
         model.addAttribute("allUsers",  userService.findAllActive());
-        model.addAttribute("totalUsers", userService.findAllActive().size());
+        model.addAttribute("inactiveUsers", userService.findAllInactive());
+        model.addAttribute("totalUsers", userService.findAllActive().size() + userService.findAllInactive().size());
         return "admin/dashboard";
     }
 
@@ -47,6 +48,13 @@ public class AdminController {
     public String deactivateUser(@PathVariable Long id, RedirectAttributes ra) {
         userService.deactivateUser(id);
         ra.addFlashAttribute("successMsg", "User deactivated.");
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/users/{id}/reactivate")
+    public String reactivateUser(@PathVariable Long id, RedirectAttributes ra) {
+        userService.reactivateUser(id);
+        ra.addFlashAttribute("successMsg", "User reactivated.");
         return "redirect:/admin";
     }
 }

@@ -17,6 +17,7 @@ import com.fintrack.model.Expense;
 public interface ExpenseService {
     Expense createExpense(ExpenseCreateDto dto, Long creatorUserId);
     Expense createExpenseWithReceipt(ExpenseCreateDto dto, MultipartFile receiptFile, Long creatorUserId);
+    Expense updateExpense(Long expenseId, ExpenseCreateDto dto, Long requestingUserId);
     Optional<Expense> findById(Long id);
     List<Expense> findByGroupId(Long groupId);
     void deleteExpense(Long expenseId, Long requestingUserId);

@@ -35,6 +35,9 @@ public class ExpenseSplit {
     @Column(name = "is_paid", nullable = false)
     private Boolean isPaid = false;
 
+    @Column(name = "settled_amount", precision = 12, scale = 2)
+    private BigDecimal settledAmount = BigDecimal.ZERO;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -48,7 +51,31 @@ public class ExpenseSplit {
     public BigDecimal getPercentage() { return percentage; }
     public BigDecimal getWeight()     { return weight; }
     public Boolean getIsPaid()        { return isPaid; }
+    public BigDecimal getSettledAmount() { return settledAmount != null ? settledAmount : BigDecimal.ZERO; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+
+    /**
+     * Returns the remaining unpaid amount for this split.
+     * This accounts for partial settlements.
+     */
+    public BigDecimal getRemainingAmount() {
+        BigDecimal settled = settledAmount != null ? settledAmount : BigDecimal.ZERO;
+        return amount.subtract(settled).max(BigDecimal.ZERO);
+    }
+
+    /**
+     * Records a settlement against this split.
+     * Returns the amount actually applied (may be less than requested if split is almost paid).
+     */
+    public BigDecimal recordSettlement(BigDecimal settlementAmount) {
+        BigDecimal remaining = getRemainingAmount();
+        BigDecimal toApply = settlementAmount.min(remaining);
+        settledAmount = getSettledAmount().add(toApply);
+        if (getRemainingAmount().compareTo(BigDecimal.ZERO) == 0) {
+            isPaid = true;
+        }
+        return toApply;
+    }
 
     // Setters
     public void setId(Long v)               { this.id = v; }
@@ -58,6 +85,7 @@ public class ExpenseSplit {
     public void setPercentage(BigDecimal v) { this.percentage = v; }
     public void setWeight(BigDecimal v)     { this.weight = v; }
     public void setIsPaid(Boolean v)        { this.isPaid = v; }
+    public void setSettledAmount(BigDecimal v) { this.settledAmount = v; }
 
     // Builder
     public static Builder builder() { return new Builder(); }
@@ -68,6 +96,7 @@ public class ExpenseSplit {
         public Builder amount(BigDecimal v)     { s.amount = v;     return this; }
         public Builder percentage(BigDecimal v) { s.percentage = v; return this; }
         public Builder weight(BigDecimal v)     { s.weight = v;     return this; }
+        public Builder settledAmount(BigDecimal v) { s.settledAmount = v; return this; }
         public ExpenseSplit build()             { return s; }
     }
 }

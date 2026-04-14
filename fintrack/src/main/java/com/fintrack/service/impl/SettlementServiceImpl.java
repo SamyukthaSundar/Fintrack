@@ -4,6 +4,7 @@ import com.fintrack.model.*;
 import com.fintrack.model.Settlement.PaymentMethod;
 import com.fintrack.observer.FinTrackEvent;
 import com.fintrack.repository.*;
+import com.fintrack.service.BalanceCalculationService;
 import com.fintrack.service.SettlementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +19,9 @@ import java.util.Optional;
 /**
  * SettlementServiceImpl — Owner: Sanika Gupta
  * State Pattern: delegates transitions to Settlement entity.
+ * 
+ * CRITICAL FIX: When a settlement is verified, it now records against ExpenseSplits
+ * via BalanceCalculationService to ensure balances are correctly reduced.
  */
 @Service
 @Transactional
@@ -29,15 +33,18 @@ public class SettlementServiceImpl implements SettlementService {
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final BalanceCalculationService balanceCalculationService;
 
     public SettlementServiceImpl(SettlementRepository settlementRepository,
                                   GroupRepository groupRepository,
                                   UserRepository userRepository,
-                                  ApplicationEventPublisher eventPublisher) {
+                                  ApplicationEventPublisher eventPublisher,
+                                  BalanceCalculationService balanceCalculationService) {
         this.settlementRepository = settlementRepository;
         this.groupRepository      = groupRepository;
         this.userRepository       = userRepository;
         this.eventPublisher       = eventPublisher;
+        this.balanceCalculationService = balanceCalculationService;
     }
 
     @Override
@@ -93,8 +100,22 @@ public class SettlementServiceImpl implements SettlementService {
             throw new SecurityException("Only the payee can verify.");
         User verifier = userRepository.findById(requestingUserId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found."));
+        
+        // Verify the settlement
         s.verify(verifier);
         s = settlementRepository.save(s);
+        
+        // CRITICAL: Record settlement against expense splits
+        // This updates the settledAmount on splits and marks them paid if fully settled
+        BigDecimal applied = balanceCalculationService.recordSettlement(
+            s.getPayer().getId(), 
+            s.getPayee().getId(), 
+            s.getGroup().getId(), 
+            s.getAmount()
+        );
+        
+        log.info("Settlement {} verified. Applied ₹{} to expense splits.", settlementId, applied);
+        
         eventPublisher.publishEvent(new FinTrackEvent(
                 this, Notification.NotificationType.SETTLEMENT_VERIFIED, s.getPayer().getId(),
                 "Payment Verified ✓",
@@ -131,6 +152,24 @@ public class SettlementServiceImpl implements SettlementService {
     @Override @Transactional(readOnly = true)
     public List<Settlement> findPendingForPayee(Long payeeId) {
         return settlementRepository.findByPayeeIdAndStatus(payeeId, Settlement.SettlementStatus.SUBMITTED);
+    }
+
+    @Override
+    public void delete(Long settlementId, Long requestingUserId) {
+        Settlement s = findOrThrow(settlementId);
+        // Only allow deletion if settlement is PENDING
+        if (s.getStatus() != Settlement.SettlementStatus.PENDING) {
+            throw new IllegalStateException("Only PENDING settlements can be deleted.");
+        }
+        // Only payer or admin can delete
+        User user = userRepository.findById(requestingUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+        boolean isAdmin = user.getRole() == User.Role.ADMIN;
+        if (!s.getPayer().getId().equals(requestingUserId) && !isAdmin) {
+            throw new SecurityException("Only the payer can delete this settlement.");
+        }
+        settlementRepository.delete(s);
+        log.info("Settlement {} deleted by user {}", settlementId, requestingUserId);
     }
 
     private Settlement findOrThrow(Long id) {
